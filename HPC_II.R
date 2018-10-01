@@ -69,12 +69,24 @@ rollForward <- function(x){
 }
 
 ####Daylight saving####
-test_DS_2007<-HPC_II %>% select(Date_Time,Date,Hour,Global_active_power)  %>%
-  filter(Date >= "2007-03-25" & Date <="2007-10-29")
-test_DS_2007<-mutate(test_DS_2007, DateTme_2= 
-                    ifelse(#Date_Time>="2007-03-25 02:00:00" & 
-                             Date_Time<"2007-10-29 01:59:00", 
-                           Date_Time + hours(1),
-                           Date_Time))
-test_DS_2007$DateTme_2<- as_datetime(test_DS_2007$DateTme_2)
-write.csv(test_DS_2007,"test_DS_2007.csv") 
+#startdate=as_datetime('2007-03-25 02:00:00')
+#enddate=as_datetime('2007-10-29 01:59:00')
+HPC_II<-mutate(HPC_II, DateTime_2= 
+         ifelse(Date_Time >= as_datetime('2007-03-25 02:00:00') & 
+        Date_Time <= as_datetime('2007-10-28 01:59:00'),Date_Time+ hours(1),
+        ifelse(Date_Time >= as_datetime('2008-03-30 02:00:00') & 
+     Date_Time <= as_datetime('2008-10-26 01:59:00'),Date_Time+ hours(1),
+     ifelse (Date_Time >= as_datetime('2009-03-29 02:00:00') & 
+       Date_Time <= as_datetime('2009-10-29 01:59:00'),Date_Time+ hours(1),
+       ifelse(Date_Time >= as_datetime('2010-03-28 02:00:00') & 
+                Date_Time <= as_datetime('2010-10-31 01:59:00'),Date_Time+ hours(1),
+                           Date_Time )))))
+
+
+#testing daylight saving #
+HPC_II$DateTime_2<- as_datetime(HPC_II$DateTime_2)
+HPC_II$Hour_2<-hour(HPC_II$DateTime_2)
+
+test_ds<-HPC_II%>% select(Hour,Hour_2,Date) %>%
+  group_by(Hour,Hour_2,Date)%>%summarise()
+write.csv(test_ds,"test_ds.csv") 
