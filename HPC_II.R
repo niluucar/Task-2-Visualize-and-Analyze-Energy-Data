@@ -93,3 +93,37 @@ HPC_II$Hour_2<-hour(HPC_II$DateTime_2)
 test_ds<-HPC_II%>% select(Hour,Hour_2,Date) %>%
   group_by(Hour,Hour_2,Date)%>%summarise()
 write.csv(test_ds,"test_ds.csv") 
+
+#### Adding month's name in order ####
+HPC_II<- transform(HPC_II, MonthAbb = month.abb[month])
+HPC_II$MonthAbb <-factor(HPC_II$MonthAbb, 
+                      levels = c("Jan", "Feb", "Mar", "Apr", "May", "Jun",
+                                 "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"))
+#### Adding day's names ####
+HPC_II$W_Days <- wday(HPC_II$Date_Time)
+HPC_II$W_Days_2 <- wday(HPC_II$Date_Time,label=TRUE)
+####Creating a Column with the Names of the Day####
+HPC_II$WeekNames <-""
+HPC_II$WeekNames [HPC_II$W_Days == "1"] <- "Sun"
+HPC_II$WeekNames [HPC_II$W_Days == "2"] <- "Mon"
+HPC_II$WeekNames [HPC_II$W_Days == "3"] <- "Tue"
+HPC_II$WeekNames [HPC_II$W_Days == "4"] <- "Wed"
+HPC_II$WeekNames [HPC_II$W_Days == "5"] <- "Thu"
+HPC_II$WeekNames [HPC_II$W_Days == "6"] <- "Fri"
+HPC_II$WeekNames [HPC_II$W_Days == "7"] <- "Sat"
+
+HPC_II$WeekNames <-factor(HPC_II$WeekNames, 
+          levels = c("Sun","Mon", "Tue", "Wed", "Thu", "Fri", "Sat" ))
+
+summary(HPC_II)
+#### checking the outliers ####
+install.packages("tsoutliers")
+library(tsoutliers)
+install.packages("expsmooth")
+library(expsmooth)
+install.packages("fma")
+library(fma)
+
+outlier.HPC_II <- tso(HPC_II,start=c(2006,1),maxit.iloop=10)
+outlier.HPC_II
+plot(outlier.chicken)
