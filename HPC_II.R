@@ -31,30 +31,39 @@ HPC_II<-HPC_II %>% mutate(Submetter3_kwh=(HPC_II$Sub_metering_3/1000))
 #### NA's ####
 
 #preproccesing the data
+NAs_2<-HPC_II %>% filter(is.na(Global_active_power))%>%select(Date_Time,Date) %>% 
+  group_by(Date_Time,Date) %>% count(Date_Time)
+
 NAs<-HPC_II %>% filter(is.na(Global_active_power)) %>%select(Date) %>% 
   group_by(Date) %>% count(Date)
 
-HPC_III<-left_join(HPC_II,NAs, by = "Date")
+HPC_NA<-left_join(NAs_2,NAs, by = "Date")
+
+HPC_III<-left_join(HPC_II,HPC_NA, by = "Date_Time")
+
+test_for_pru<-HPC_III%>% select(Date.x,n.y,Date_Time)%>%
+  filter(Date.x>="2006-12-20" & Date.x<="2006-12-21")
 
 #NAs replaced by last value known
-#HPC_3$B<-na.locf(HPC_3$Global_reactive_kwh, na.rm = FALSE, maxgap = 1440)
+HPC_III<-na.locf(HPC_III, na.rm = FALSE, maxgap = 1440)
 
-HPC_III$n[is.na(HPC_III$n)] <- 0
+HPC_III$n.y[is.na(HPC_III$n.y)] <- 0
+HPC_III$n.x[is.na(HPC_III$n.x)] <- 0
 
-HPC_III<-mutate(HPC_III, Global_Consumption_kwh_2= ifelse(n >= 1000, 0, 
+HPC_III<-mutate(HPC_III, Global_Consumption_kwh_2= ifelse(n.y >= 1000, 0, 
                                                       replace_na_with_last(Global_Consumption_kwh) ))
-HPC_III<-mutate(HPC_III, Global_reactive_kwh_2= ifelse(n >= 1000, 0, 
+HPC_III<-mutate(HPC_III, Global_reactive_kwh_2= ifelse(n.y >= 1000, 0, 
                                                    replace_na_with_last(Global_reactive_kwh) ))
 
-HPC_III<-mutate(HPC_III, Global_intensity_2= ifelse(n >= 1000, 0, 
+HPC_III<-mutate(HPC_III, Global_intensity_2= ifelse(n.y >= 1000, 0, 
                                                 rollForward(Global_intensity) ))
-HPC_III<-mutate(HPC_III, Voltage_2= ifelse(n >= 1000, 0, 
+HPC_III<-mutate(HPC_III, Voltage_2= ifelse(n.y >= 1000, 0, 
                                        rollForward(Voltage) ))
-HPC_III<-mutate(HPC_III, Submetter1_kwh_2= ifelse(n >= 1000, 0, 
+HPC_III<-mutate(HPC_III, Submetter1_kwh_2= ifelse(n.y >= 1000, 0, 
                                               rollForward(Submetter1_kwh) ))
-HPC_III<-mutate(HPC_III, Submetter2_kwh_2= ifelse(n >= 1000, 0, 
+HPC_III<-mutate(HPC_III, Submetter2_kwh_2= ifelse(n.y >= 1000, 0, 
                                               rollForward(Submetter2_kwh) ))
-HPC_III<-mutate(HPC_III, Submetter3_kwh_2= ifelse(n >= 1000, 0, 
+HPC_III<-mutate(HPC_III, Submetter3_kwh_2= ifelse(n.y >= 1000, 0, 
                                               rollForward(Submetter3_kwh) ))
 
 summary(HPC_III)
@@ -121,15 +130,74 @@ HPC_III$WeekNames <-factor(HPC_III$WeekNames,
 summary(HPC_III)
 
 ####Filtering the data ####
-
-HPC_IV <- HPC_III %>% select(Date,Time,DateTime_2,Hour,month,day,
+HPC_III$Year<-year(HPC_III$Date.x)
+HPC_monthly_2 <- HPC_III %>% select(Year,Time,Hour,month,day,
                              Global_Consumption_kwh_2,Global_reactive_kwh_2,
                              Global_intensity_2,Submetter1_kwh_2,
                              Submetter2_kwh_2,
                              Submetter3_kwh_2,Voltage_2,MonthAbb,W_Days,
-                             WeekNames)
+                             WeekNames)%>%filter(Year!=2006) %>% group_by(Year,month) %>%
+  summarise_at(vars(Global_Consumption_kwh_2,Global_reactive_kwh_2,
+                    Global_intensity_2,Submetter1_kwh_2,
+                    Submetter2_kwh_2,
+                    Submetter3_kwh_2,Voltage_2),
+               funs(sum))
+  
+   #summarise(MeanGAP = mean(Global_Consumption_kwh_2, na.rm = TRUE),
+#MeanGRP = mean(Global_reactive_kwh_2, na.rm = TRUE),
+#MeanGI = mean(Global_intensity_2, na.rm = TRUE),
+#MeanSubm1 = mean(Submetter1_kwh_2, na.rm = TRUE),
+#MeanSubm2 = mean(Submetter2_kwh_2, na.rm = TRUE),
+#MeanSubm3 = mean( Submetter3_kwh_2, na.rm = TRUE),
+#MeanVoltage=mean(Voltage_2,na.rm=TRUE))
+
+HPC_monthly$Date <- as.yearmon(HPC_monthly$Date.x)
+
+####Adding seasons ####
+SeasonData<-HPC_III
+
+Winter <- as_date("2008-12-21") #Winter Solstice
+Spring <- as_date("2008-3-20") #Spring Equinox
+Summer <- as_date("2008-6-21") #Summer Solstice
+Autumn <- as_date("2008-9-22") # Fall Equinox
+
+seasondates<-as_date(format(HPC_III$Date.x,"%2008-%m-%d"))
+
+HPC_III$Season<-ifelse(seasondates>=as.Date(Autumn) & 
+                         seasondates<=as.Date(Winter), "Autumn",
+   ifelse(seasondates>=as.Date(Spring) & seasondates<=as.Date(Summer), "Spring",
+   ifelse(seasondates>=as.Date(Summer) & seasondates<=as.Date(Autumn), "Summer",
+          "Winter")))
+HPC_III$Season<-as.factor(HPC_III$Season)
 
 
-#### TIME SERIES ####
+#### TIME SERIES #### 
 
-HPC_TS <- ts(HPC_IV, frequency=12, start=c(2006,1))
+install.packages("forecast")
+library(forecast)
+HPC_TSsum <- ts(HPC_monthly_2, frequency=12, start=c(2007,1))
+HPC_TSsum
+plot(HPC_TS)
+
+#### TS only for GAP###
+HPC_gap <- HPC_III %>% select(Year,Time,month,
+             Global_Consumption_kwh_2)%>%filter(Year!=2006) %>% group_by(Year,month) %>%
+  summarise_at(vars(Global_Consumption_kwh_2),
+               funs(sum))
+HPC_TSGAP <- ts(HPC_gap$Global_Consumption_kwh_2, frequency=12, start=c(2007,1))
+HPC_TSGAP
+plot(HPC_TSGAP)
+autoplot(HPC_TSGAP)
+comp <- decompose(HPC_TSGAP)
+plot(comp)
+forecastHW_GAP<-stats::HoltWinters(HPC_TSGAP)
+
+forecast <- forecast::forecast(forecastHW_GAP, h=24,findfrequency = TRUE)
+plot(forecastHW_GAP)
+
+plot(forecast::forecast(forecastHW_GAP, h=30, level=c(80,95)), xaxt='n')
+
+plot(forecastHW_GAP, forecast)
+
+autoplot(forecast)
+
